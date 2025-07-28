@@ -1,31 +1,43 @@
-# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
-
-name: Node.js CI
+name: Deploy to S3 and Invalidate CloudFront
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
-  build:
-
+  build-and-deploy:
     runs-on: ubuntu-latest
 
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x, 22.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
-
     steps:
-    - uses: actions/checkout@v4
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    - run: npm ci
-    - run: npm run build --if-present
-    - run: npm test
+      - name: Checkout repositorio
+        uses: actions/checkout@v3
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '22'  # O el que necesites
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Construir proyecto
+        run: npm run build
+
+      - name: Subir archivos a S3
+        run: |
+          aws s3 sync build/ s3://TU_BUCKET --delete
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.ASIA2NPQAWZR42GW5IIA }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.NLhWEvorfIzMSoziOQ57DPLhxXvndUV69FL8/9xq }}
+          AWS_REGION: ${{ secrets.us-east-1 }}
+
+      - name: Invalidar CloudFront
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.E37T6CYGXD4ZXF }} \
+            --paths "/*"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.ASIA2NPQAWZR42GW5IIA }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.NLhWEvorfIzMSoziOQ57DPLhxXvndUV69FL8/9xq }}
+          AWS_REGION: ${{ secrets.us-east-1 }}
